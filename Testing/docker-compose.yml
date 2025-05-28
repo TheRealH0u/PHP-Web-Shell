@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  apache-php:
+    build: ./apache-php
+    ports:
+      - "80:80"
+    volumes:
+      - ./../overkill.php:/var/www/html/overkill.php
+    depends_on:
+      - mysql
+    networks:
+      - app-network
+
+  mysql:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    networks:
+      - app-network
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    ulimits:
+      nofile: # Fix memory leak issue on some systems when LimitCORE=infinity (containerd)
+        soft: 1048576
+        hard: 1048576
+
+volumes:
+  db-data:
+
+networks:
+  app-network:
