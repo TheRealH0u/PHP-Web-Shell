@@ -3,12 +3,12 @@ This is a not so simple PHP Web Shell, codename Overkill, created for Penetratio
 
 ## TODO
 - [x] Protected Login
-- [ ] Tree of files where to execute
+- [x] Tree of files where to execute
 - [ ] Dump button
 - [ ] LinPEAS
-- [ ] Revshell
+- [x] Revshell
 - [ ] Select what to execute as (exec, shell, system) (Bonus points if automatic)
-- [ ] Automatic revshell generation using programs that are installed
+- [x] Automatic revshell generation using programs that are installed
 - [ ] Clean up (Track what you did and uploaded)
 - [ ] Command History
 - [ ] Input URL to instantly upload a shell or script
