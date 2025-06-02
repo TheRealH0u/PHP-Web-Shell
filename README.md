@@ -4,7 +4,7 @@ This is a not so simple PHP Web Shell, codename Overkill, created for Penetratio
 ## TODO
 - [x] Protected Login
 - [x] Tree of files where to execute
-- [ ] Dump button
+- [x] Dump button
 - [ ] LinPEAS
 - [x] Revshell
 - [ ] Select what to execute as (exec, shell, system) (Bonus points if automatic)
