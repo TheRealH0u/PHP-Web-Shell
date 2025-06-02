@@ -12,5 +12,5 @@ This is a not so simple PHP Web Shell, codename Overkill, created for Penetratio
 - [ ] Clean up (Track what you did and uploaded)
 - [ ] Command History
 - [ ] Input URL to instantly upload a shell or script
-- [ ] Upload files
+- [x] Upload files
 - [ ] Download files
