@@ -2,15 +2,15 @@
 This is a not so simple PHP Web Shell, codename Overkill, created for Penetration testers that want a bit more out of their Web Shell.  
 
 ## TODO
+- [ ] Clean up (Track what you did and uploaded)
+- [ ] LinPEAS
 - [x] Protected Login
 - [x] Tree of files where to execute
 - [x] Dump button
-- [ ] LinPEAS
 - [x] Revshell
-- [ ] Select what to execute as (exec, shell, system) (Bonus points if automatic)
+- [x] Select what to execute as (exec, shell, system) (Bonus points if automatic)
 - [x] Automatic revshell generation using programs that are installed
-- [ ] Clean up (Track what you did and uploaded)
-- [ ] Command History
+- [x] Command History
 - [x] Input URL to instantly upload a shell or script
 - [x] Upload files
 - [x] Download files

