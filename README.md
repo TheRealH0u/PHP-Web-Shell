@@ -3,7 +3,7 @@ This is a not so simple PHP Web Shell, codename Overkill, created for Penetratio
 
 ## TODO
 - [ ] Clean up (Track what you did and uploaded)
-- [ ] LinPEAS
+- [x] LinPEAS
 - [x] Protected Login
 - [x] Tree of files where to execute
 - [x] Dump button
