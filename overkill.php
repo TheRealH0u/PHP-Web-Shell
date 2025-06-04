@@ -717,6 +717,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
 </head>
 <body>
     <div id="loading-overlay" style="display:none;">Dumping folder... (This will take a long time. Go make some coffee or take a shit...)</div>
+    <a class="btn-red" style="position:absolute; right:10px; top:0; width: 100px; text-align:center" href="?logout=True">Log&nbsp;Out</a>
     <div class="grid">
         <div class="card">
             <!-- Services, Auto Revshell Generator -->
