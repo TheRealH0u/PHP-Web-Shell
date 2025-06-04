@@ -3,7 +3,7 @@ ob_start();
 
 // ?   PROTECTED LOGIN START
 $MASTER_PASSWORD = 'yourStrongMasterPasswordHere';
-$COOKIE_NAME = 'sql_auth';
+$COOKIE_NAME = 'overkill_auth';
 $COOKIE_TTL = time() + (86400 * 30);  // 30 days
 
 // Handle login form submission
@@ -20,7 +20,6 @@ if (isset($_POST['master_password'])) {
 // Handle logout
 if (isset($_GET['logout'])) {
     setcookie($COOKIE_NAME, '', time() - 3600, '/', '', false, true);  // Expire the cookie
-    setcookie('sql_auth_data', '', time() - 3600, '/', '', false, true);
     header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
     exit;
 }
