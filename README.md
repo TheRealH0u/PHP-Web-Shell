@@ -5,7 +5,7 @@ This is a not so simple PHP Web Shell, codename Overkill, created for Penetratio
 - [ ] Clean up (Track what you did and uploaded)
 - [ ] Switch services and Reverse Shell (Better flow)
 - [ ] Add custom execution of commands like ps aux or other like bookmarks
-- [ ] Figure out how to add color to pre if you run linpeas
+- [x] Figure out how to add color to pre if you run linpeas (/var/www/html/linpeas.sh > peas2_out.txt 2>&1)
 - [x] Add to go back to root in file explorer
 - [x] Add versioning to services
 - [x] LinPEAS

