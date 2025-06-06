@@ -4,7 +4,7 @@ services:
   apache-php:
     build: ./apache-php
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./../overkill.php:/var/www/html/overkill.php
     depends_on:
