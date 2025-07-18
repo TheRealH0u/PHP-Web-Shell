@@ -1,12 +1,25 @@
 version: '3.8'
 
 services:
-  apache-php:
-    build: ./apache-php
+  apache-php-5.2:
+    build: ./apache-php-5.2
     ports:
-      - "8080:80"
+      - "8052:80"
     volumes:
-      - ./../overkill.php:/var/www/html/overkill.php
+      - ./../overkill-5.2.php:/var/www/overkill-5.2.php
+      - ./../overkill-8.1.php:/var/www/overkill-8.1.php
+    depends_on:
+      - mysql
+    networks:
+      - app-network
+  
+  apache-php-8.1:
+    build: ./apache-php-8.1
+    ports:
+      - "8081:80"
+    volumes:
+      - ./../overkill-5.2.php:/var/www/html/overkill-5.2.php
+      - ./../overkill-8.1.php:/var/www/html/overkill-8.1.php
     depends_on:
       - mysql
     networks:
